@@ -2,16 +2,12 @@ package com.alice.videotalk;
 
 import android.Manifest;
 import android.app.Activity;
-import android.app.MediaRouteActionProvider;
-import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.database.Cursor;
 import android.graphics.Color;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.VirtualDisplay;
-import android.media.MediaActionSound;
 import android.media.MediaRecorder;
 import android.media.projection.MediaProjection;
 import android.media.projection.MediaProjectionManager;
@@ -19,7 +15,6 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
-import android.provider.MediaStore;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.text.TextUtils;
@@ -29,11 +24,9 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
-import android.widget.TextView;
 import android.widget.VideoView;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Random;
 
 import master.flame.danmaku.controller.DrawHandler;
@@ -177,22 +170,30 @@ public class VideoPlay extends Activity {
                         mediaProjectionManager = (MediaProjectionManager) getSystemService(Context.MEDIA_PROJECTION_SERVICE);
                         Intent captureIntent = mediaProjectionManager.createScreenCaptureIntent();
                         startActivityForResult(captureIntent, REQUEST_CODE);
-                        Log.d("alice_debug", "mediaProjectionManager is empty");
-                        mMediaRecorder = new MediaRecorder();
-                        DisplayMetrics metrics = new DisplayMetrics();
-                        metrics = getResources().getDisplayMetrics();
+
+                    }
+                    Log.d("alice_debug", "mediaProjectionManager is empty");
+                    mMediaRecorder = new MediaRecorder();
+                    DisplayMetrics metrics = new DisplayMetrics();
+                     metrics = getResources().getDisplayMetrics();
                         int mScreenWidth = metrics.widthPixels;
                         int mScreenHeight = metrics.heightPixels;
                         int mScreenDensity = metrics.densityDpi;
                         Log.d("alice_debug", "initial mMediaRecorder in videoRecord");
+                        initRecorder(mScreenWidth, mScreenHeight);
+                        if(mMediaProjection != null) {
+                            mVirtualDisplay = mMediaProjection.createVirtualDisplay("MainActivity",
+                                    mScreenWidth, mScreenHeight, mScreenDensity, DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                                    mMediaRecorder.getSurface(), null, null);
+                        }
                         //initRecorder(mScreenWidth, mScreenHeight);
                         //Intent intent = new Intent();
                         //intent.setType("video/*");
                         //intent.setAction(Intent.ACTION_GET_CONTENT);
                         //startActivityForResult(intent, FILE_CHOICE);
-
-                        videoRecord.setText("Stop");
-                    }
+                    StartRecord();
+                    videoRecord.setText("Stop");
+                    operationView.setVisibility(View.GONE);
                 } else {
                     StopRecord();
                     videoRecord.setText("Record");
@@ -314,21 +315,21 @@ public class VideoPlay extends Activity {
                 return;
             }
             mMediaProjection = mediaProjectionManager.getMediaProjection(result_code, data);
+            if(mMediaProjection == null) {
+                Log.d("alice_debug", "mMediaProjection is null. Return");
+                return;
+            }
             mMediaProjectionCallback = new MediaProjectionCallback();
-            DisplayMetrics metrics = new DisplayMetrics();
-            metrics = getResources().getDisplayMetrics();
+            DisplayMetrics metrics = getResources().getDisplayMetrics();
             int mScreenWidth = metrics.widthPixels;
             int mScreenHeight = metrics.heightPixels;
             int mScreenDensity = metrics.densityDpi;
-            Log.d("alice_debug", "initial mMediaRecorder");
-            initRecorder(mScreenWidth, mScreenHeight);
+            Log.d("alice_debug", "initial Virtual Display");
+            //initRecorder(mScreenWidth, mScreenHeight);
             mVirtualDisplay = mMediaProjection.createVirtualDisplay("MainActivity",
                     mScreenWidth, mScreenHeight, mScreenDensity, DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
                     mMediaRecorder.getSurface(), null, null);
-            StartRecord();
-//            StartRecord();
-
-
+            if(isRecording == false) StartRecord();
         } else if(request_code == FILE_CHOICE){
             if(result_code == RESULT_OK){
 
@@ -375,9 +376,6 @@ public class VideoPlay extends Activity {
             mMediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);// 音频格式
             mMediaRecorder.setVideoFrameRate(16);//帧率
             mMediaRecorder.setVideoEncodingBitRate(5242880);//视频清晰度
-            //int rotation = getWindowManager().getDefaultDisplay().getRotation();
-            //int orientataion = ORIENTTIONS.get(rotation + 90);
-            //mMediaRecorder.setOrientationHint(orientataion);//设置旋转方向
             mMediaRecorder.prepare();
         } catch (IOException e) {
             e.printStackTrace();
